@@ -1,148 +1,187 @@
-" Disable compatibility with vi which can cause unexpected issues.
 set nocompatible
-
-" backup files can cause issues??
+set clipboard=unnamedplus
 set nobackup
 set nowritebackup
-
-" give more space for display msg
 set cmdheight=2
-
-" Enable type file detection. Vim will be able to try to detect the type of file in use.
-"filetype on
-filetype plugin indent on
-
-" Turn syntax highlighting on.
 syntax on
-
-" enable 256 colors in term
+filetype plugin indent on
 set t_Co=256
-
-" enables true colors for nvim
 let $NVIM_TUI_ENABLE_TRUE_COLOR=1
-
-" Add numbers to each line on the left-hand side.
 set number
-
-" Set tab width to 4 columns.
 set tabstop=4
-
-" number of spaces for indentation
-"set shiftwidth=4
-
-" Stop cursor from scrolling to the bottom
 set scrolloff=10
-
-" Dont wrap lines
 set nowrap
-
-" Color set for dark screens
 set background=dark
-
-" Enables shared clipboard between vim and os
-set clipboard=unnamedplus
-
-" Highlight current line
-"set cursorline
-
-" modifies auto-complete menu to behave like ide
-" set completeopt
-
-" show line number starting from current line
 set relativenumber
-
-" change split screen behavior, always split below and right
-" set splitbelow splitright
-
-" Show file title
 set title
 
-" PLUGINS
-call plug#begin()
-   " Appearance
-    Plug 'vim-airline/vim-airline'
-    Plug 'ryanoasis/vim-devicons'
-	Plug 'morhetz/gruvbox'
+call plug#begin('~/.vim/plugged')
 
-    " Utilities
-    Plug 'sheerun/vim-polyglot'
-    Plug 'jiangmiao/auto-pairs'
-    Plug 'ap/vim-css-color'
-    Plug 'preservim/nerdtree'
+" Collection of common configurations for the Nvim LSP client
+Plug 'neovim/nvim-lspconfig'
 
-    " Completion / linters / formatters
-    Plug 'neoclide/coc.nvim', {'branch': 'release'}
-    "Plug 'plasticboy/vim-markdown'
+" Autocompletion framework
+Plug 'hrsh7th/nvim-cmp'
+" cmp LSP completion
+Plug 'hrsh7th/cmp-nvim-lsp'
+" cmp Snippet completion
+Plug 'hrsh7th/cmp-vsnip'
+" cmp Path completion
+Plug 'hrsh7th/cmp-path'
+Plug 'hrsh7th/cmp-buffer'
+" See hrsh7th other plugins for more great completion sources!
 
-    " Git
-    Plug 'airblade/vim-gitgutter'
+" Adds extra functionality over rust analyzer
+Plug 'simrat39/rust-tools.nvim'
+
+" Snippet engine
+Plug 'hrsh7th/vim-vsnip'
+
+" Optional
+Plug 'nvim-lua/popup.nvim'
+Plug 'nvim-lua/plenary.nvim'
+Plug 'nvim-telescope/telescope.nvim'
+
+" Some color scheme other then default
+Plug 'arcticicestudio/nord-vim'
+Plug 'airblade/vim-gitgutter'
+Plug 'jiangmiao/auto-pairs'
+
+" Appearance
+Plug 'vim-airline/vim-airline'
+Plug 'ryanoasis/vim-devicons'
+Plug 'morhetz/gruvbox'
+
+
 call plug#end()
 
-" Plugin configs
+colorscheme gruvbox
+
+autocmd BufWritePre *.rs lua vim.lsp.buf.formatting_sync(nil, 200)
+
+" Set completeopt to have a better completion experience
+" :help completeopt
+" menuone: popup even when there's only one match
+" noinsert: Do not insert text until a selection is made
+" noselect: Do not select, force user to select one from the menu
+set completeopt=menuone,noinsert,noselect
+
+" Avoid showing extra messages when using completion
+set shortmess+=c
+
+" Configure LSP through rust-tools.nvim plugin.
+" rust-tools will configure and enable certain LSP features for us.
+" See https://github.com/simrat39/rust-tools.nvim#configuration
+lua <<EOF
+
+-- nvim_lsp object
+local nvim_lsp = require'lspconfig'
+
+local opts = {
+    tools = {
+        autoSetHints = true,
+        hover_with_actions = true,
+        runnables = {
+            use_telescope = true
+        },
+        inlay_hints = {
+            show_parameter_hints = false,
+            parameter_hints_prefix = "",
+            other_hints_prefix = "",
+        },
+    },
+
+    -- all the opts to send to nvim-lspconfig
+    -- these override the defaults set by rust-tools.nvim
+    -- see https://github.com/neovim/nvim-lspconfig/blob/master/CONFIG.md#rust_analyzer
+    server = {
+        -- on_attach is a callback called when the language server attachs to the buffer
+        -- on_attach = on_attach,
+        settings = {
+            -- to enable rust-analyzer settings visit:
+            -- https://github.com/rust-analyzer/rust-analyzer/blob/master/docs/user/generated_config.adoc
+            ["rust-analyzer"] = {
+                -- enable clippy on save
+                checkOnSave = {
+                    command = "clippy"
+                },
+            }
+        }
+    },
+}
+
+require('rust-tools').setup(opts)
+EOF
+
+" Code navigation shortcuts
+" as found in :help lsp
+nnoremap <silent> <c-]> <cmd>lua vim.lsp.buf.definition()<CR>
+nnoremap <silent> K     <cmd>lua vim.lsp.buf.hover()<CR>
+nnoremap <silent> gD    <cmd>lua vim.lsp.buf.implementation()<CR>
+nnoremap <silent> <c-k> <cmd>lua vim.lsp.buf.signature_help()<CR>
+nnoremap <silent> 1gD   <cmd>lua vim.lsp.buf.type_definition()<CR>
+nnoremap <silent> gr    <cmd>lua vim.lsp.buf.references()<CR>
+nnoremap <silent> g0    <cmd>lua vim.lsp.buf.document_symbol()<CR>
+nnoremap <silent> gW    <cmd>lua vim.lsp.buf.workspace_symbol()<CR>
+nnoremap <silent> gd    <cmd>lua vim.lsp.buf.definition()<CR>
+
+" Quick-fix
+nnoremap <silent> ga    <cmd>lua vim.lsp.buf.code_action()<CR>
+
+" Setup Completion
+" See https://github.com/hrsh7th/nvim-cmp#basic-configuration
+lua <<EOF
+local cmp = require'cmp'
+cmp.setup({
+  snippet = {
+    expand = function(args)
+        vim.fn["vsnip#anonymous"](args.body)
+    end,
+  },
+  mapping = {
+    ['<C-p>'] = cmp.mapping.select_prev_item(),
+    ['<C-n>'] = cmp.mapping.select_next_item(),
+    -- Add tab support
+    ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+    ['<Tab>'] = cmp.mapping.select_next_item(),
+    ['<C-d>'] = cmp.mapping.scroll_docs(-4),
+    ['<C-f>'] = cmp.mapping.scroll_docs(4),
+    ['<C-Space>'] = cmp.mapping.complete(),
+    ['<C-e>'] = cmp.mapping.close(),
+    ['<CR>'] = cmp.mapping.confirm({
+      behavior = cmp.ConfirmBehavior.Insert,
+      select = true,
+    })
+  },
+
+  -- Installed sources
+  sources = {
+    { name = 'nvim_lsp' },
+    { name = 'vsnip' },
+    { name = 'path' },
+    { name = 'buffer' },
+  },
+})
+EOF
+
+" have a fixed column for the diagnostics to appear in
+" this removes the jitter when warnings/errors flow in
+set signcolumn=yes
+
+" Set updatetime for CursorHold
+" 300ms of no cursor movement to trigger CursorHold
+set updatetime=300
+" Show diagnostic popup on cursor hover
+autocmd CursorHold * lua vim.diagnostic.open_float(nil, { focusable = false })
+
+" Goto previous/next diagnostic warning/error
+nnoremap <silent> g[ <cmd>lua vim.diagnostic.goto_prev()<CR>
+nnoremap <silent> g] <cmd>lua vim.diagnostic.goto_next()<CR>
+
 
 " Airline
 let g:airline_powerline_fonts=1
 let g:airline#extensions#tabline#enabled=1
-
-" Nerdtree
-let NERDTreeShowHidden=1
-
-" Langauge Server Stuff
-command! -nargs=0 Prettier :call CocAction('runCommand', 'prettier.formatFile')
-
-" Mappings
-
-" ctrl+q force quit
-nnoremap <C-q> :q!<CR>
-" close open file
-nnoremap <F4> :bd<CR>
-" toggle nerdtree
-nnoremap <F5> :NERDTreeToggle<CR>
-" open terminal below
-nnoremap <F6> :sp<CR>:terminal<CR>
-
-" make nvim faster
-set updatetime=300
-
-" Dont pass msgs to ins-completion-menu
-set shortmess+=c
-
-" Always show a single column?
-"set signcolumn=number
-
-" Use tab for trigger completion with characters ahead and navigate.
-" NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
-" other plugin before putting this into your config.
-inoremap <silent><expr> <TAB>
-      \ pumvisible() ? "\<C-n>" :
-      \ <SID>check_back_space() ? "\<TAB>" :
-      \ coc#refresh()
-inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
-
-function! s:check_back_space() abort
-  let col = col('.') - 1
-  return !col || getline('.')[col - 1]  =~# '\s'
-endfunction
-
-" Use <c-space> to trigger completion.
-if has('nvim')
-  inoremap <silent><expr> <c-space> coc#refresh()
-else
-  inoremap <silent><expr> <c-@> coc#refresh()
-endif
-
-" Make <CR> auto-select the first completion item and notify coc.nvim to
-" format on enter, <cr> could be remapped by other vim plugin
-inoremap <silent><expr> <cr> pumvisible() ? coc#_select_confirm()
-                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
-
-" Use `[g` and `]g` to navigate diagnostics
-" Use `:CocDiagnostics` to get all diagnostics of current buffer in location list.
-nmap <silent> [g <Plug>(coc-diagnostic-prev)
-nmap <silent> ]g <Plug>(coc-diagnostic-next)
-
-" color theme
-colorscheme gruvbox
 
 " enter and shift enter place a new line
 nmap <S-Enter> O<Esc>
